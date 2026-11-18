@@ -1577,6 +1577,44 @@ function createDOMPurify(window: WindowLike = getGlobal()): DOMPurify {
   };
 
   /**
+   * The HTML parser files a <template> that appears before any body content
+   * under <head>, and only the body is walked and serialized, so such a
+   * template would vanish without ever being seen. Relocate head templates
+   * to the start of the body, where they are sanitized and kept like any
+   * other element. Every other head child stays behind and is stripped as
+   * before.
+   *
+   * @param doc the parsed document
+   * @param body the body the walk and serialization operate on
+   */
+  const _relocateHeadTemplates = function (doc: Document, body: Element) {
+    /* Only the body-only HTML mode drops head content; WHOLE_DOCUMENT
+       keeps the head in the walk root, other namespaces have no head. */
+    if (NAMESPACE !== HTML_NAMESPACE || WHOLE_DOCUMENT) {
+      return;
+    }
+
+    const head = getElementsByTagName.call(doc, 'head')[0];
+
+    if (!head) {
+      return;
+    }
+
+    const headTemplates = head.querySelectorAll('template');
+    const anchor = body.firstChild;
+
+    /* Static list in document order, inserted before the same anchor */
+    arrayForEach(headTemplates, (template) => {
+      if (anchor) {
+        anchor.before(template);
+      } else {
+        // eslint-disable-next-line unicorn/prefer-dom-node-append
+        body.appendChild(template);
+      }
+    });
+  };
+
+  /**
    * _initDocument
    *
    * @param dirty - a string of dirty markup
@@ -1630,6 +1668,8 @@ function createDOMPurify(window: WindowLike = getGlobal()): DOMPurify {
     }
 
     const body = doc.body || doc.documentElement;
+
+    _relocateHeadTemplates(doc, body);
 
     if (dirty && leadingWhitespace) {
       body.insertBefore(

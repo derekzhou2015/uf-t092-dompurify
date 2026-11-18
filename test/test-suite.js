@@ -757,6 +757,58 @@
     });
 
     QUnit.test(
+      'leading template element is kept and sanitized in default config',
+      (assert) => {
+        // A template before any body content is filed under <head> by the
+        // HTML parser; it must still be walked, sanitized and serialized.
+        assert.equal(
+          DOMPurify.sanitize('<template><p>hello</p></template>'),
+          '<template><p>hello</p></template>'
+        );
+        assert.equal(
+          DOMPurify.sanitize(
+            '<template><img src=x onerror=alert(1)></template><p>tail</p>'
+          ),
+          '<template><img src="x"></template><p>tail</p>'
+        );
+        assert.equal(
+          DOMPurify.sanitize(
+            '<template><a href="javascript:alert(1)">x</a></template>'
+          ),
+          '<template><a>x</a></template>'
+        );
+        assert.equal(
+          DOMPurify.sanitize('<template><template><b>n</b></template></template>'),
+          '<template><template><b>n</b></template></template>'
+        );
+
+        // The removal of a dangerous attribute inside a relocated template
+        // is recorded like any other removal.
+        DOMPurify.sanitize('<template><img src=x onerror=alert(1)></template>');
+        assert.equal(DOMPurify.removed.length, 1);
+        assert.ok(DOMPurify.removed[0].attribute);
+      }
+    );
+
+    QUnit.test(
+      'head stripping still applies to non-template head elements',
+      (assert) => {
+        assert.equal(
+          DOMPurify.sanitize('<title>x</title><p>y</p>'),
+          '<p>y</p>'
+        );
+        assert.equal(
+          DOMPurify.sanitize('<style>a{color:red}</style><p>y</p>'),
+          '<p>y</p>'
+        );
+        assert.equal(
+          DOMPurify.sanitize('<meta charset="utf-8"><p>y</p>'),
+          '<p>y</p>'
+        );
+      }
+    );
+
+    QUnit.test(
       'entity round-trip — github.com/cure53/DOMPurify/issues/283',
       (assert) => {
         assert.equal(
